@@ -1,0 +1,33 @@
+ARG AWS_CDK_VERSION=2.67.0
+FROM node:14-alpine
+
+RUN apk -v --no-cache --update add \
+        python3 \
+        py3-pip \
+        ca-certificates \
+        groff \
+        less \
+        bash \
+        make \
+        curl \
+        wget \
+        zip \
+        git \
+        jq \
+        && \
+    update-ca-certificates && \
+    npm install -g aws-cdk@${AWS_CDK_VERSION}
+
+RUN pip3 install --upgrade pip \
+    && pip3 install \
+    awscli
+
+VOLUME [ "/root/.aws" ]
+VOLUME [ "/opt/app" ]
+
+# Allow for caching python modules
+VOLUME ["/usr/lib/python3.8/site-packages/"]
+
+WORKDIR /opt/app
+
+CMD ["cdk", "--version"]

@@ -1,0 +1,15 @@
+version: "3.8"
+services:
+  aws-cdk:
+    container_name: aws-cdk-math-api
+    image: aws-cdk
+    build:
+      args:
+        AWS_CDK_VERSION: 2.67.0
+      context: .
+    working_dir: /work
+    entrypoint: /bin/bash
+    stdin_open: true
+    tty: true
+    volumes:
+    - .:/work
