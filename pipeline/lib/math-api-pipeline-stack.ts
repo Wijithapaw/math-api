@@ -29,6 +29,18 @@ export class MathApiPipelineStack extends cdk.Stack {
       ]
     });
 
+    const mathapi_square_build = new pipelines.CodeBuildStep('MathApiBuildSquare', {
+      input: source,
+      buildEnvironment: {
+        buildImage: codebuild.LinuxBuildImage.STANDARD_6_0
+      },
+      primaryOutputDirectory: "src/publishsquare",
+      commands: [
+        'cd src',
+        'dotnet publish ./MathApi/SquareLambda/SquareLambda.csproj -c Release -o publishsquare',
+      ]
+    });
+
     const pipepine_build = new pipelines.CodeBuildStep('PipelineBuild', {
       input: source,
       buildEnvironment: {
@@ -41,7 +53,8 @@ export class MathApiPipelineStack extends cdk.Stack {
         'npm run cdk synth'
       ],
       additionalInputs: {
-        'pipeline/out/math-api': mathapi_build
+        'pipeline/out/math-api': mathapi_build,
+        'pipeline/out/math-api-square': mathapi_square_build
       }
     });
 
@@ -61,7 +74,8 @@ export class DeployStage extends Stage {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
     const sqrtlambda = new SqrtlambdaStack(this, "SqrtlambdaStack");
-    const api = new ApiGwStack(this, "ApiGwStack", { sqrtlambda: sqrtlambda.lambda });
+    const squarelambda = new SquarelambdaStack(this, "SquarelambdaStack");
+    const api = new ApiGwStack(this, "ApiGwStack", { sqrtlambda: sqrtlambda.lambda, squarelambda: squarelambda.lambda });
   }
 }
 
@@ -81,8 +95,25 @@ export class SqrtlambdaStack extends Stack {
   }
 }
 
+export class SquarelambdaStack extends Stack {
+  lambda: lambda.Function;
+  constructor(scope: Construct, id: string, props?: StackProps) {
+    super(scope, id, props);
+
+    const sqrtLambda = new lambda.Function(this, "SqrtLambda", {
+      code: lambda.Code.fromAsset('out/math-api-square'),
+      runtime: lambda.Runtime.DOTNET_6,
+      handler: 'SquareLambda::SquareLambda.Function::FunctionHandler',
+      functionName: 'Square'
+    });
+
+    this.lambda = sqrtLambda;
+  }
+}
+
 export interface ApiGwStackProps extends StackProps {
-  sqrtlambda: lambda.Function
+  sqrtlambda: lambda.Function,
+  squarelambda: lambda.Function
 }
 
 export class ApiGwStack extends Stack {
@@ -94,5 +125,9 @@ export class ApiGwStack extends Stack {
     const sqrt = api.root.addResource("sqrt")
     const sqrt_num = sqrt.addResource("{number}");
     sqrt_num.addMethod('GET', new apigateway.LambdaIntegration(props.sqrtlambda));
+
+    const square = api.root.addResource("square")
+    const square_num = square.addResource("{number}");
+    square_num.addMethod('GET', new apigateway.LambdaIntegration(props.squarelambda));
   }
 }
